@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="E:\AIPROJECT\venv"
+VIRTUAL_ENV="C:\Users\user\Desktop\Google_Cloud_Ai_Project\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
