@@ -52,50 +52,40 @@ def load_all_json_data(folder_path):
                             all_data.append(entry)
     return all_data
 
-# Extract all zip files
 extract_all_zips(train_path)
 extract_all_zips(valid_path)
 
-# Load and combine all data
 train_data = load_all_json_data(train_path)
 valid_data = load_all_json_data(valid_path)
 
-# Create DataFrame and sort by page
 train_df = pd.DataFrame(train_data).sort_values(by=['title', 'page'])
 valid_df = pd.DataFrame(valid_data).sort_values(by=['title', 'page'])
 
-# Convert DataFrame to Dataset
 train_dataset = Dataset.from_pandas(train_df)
 valid_dataset = Dataset.from_pandas(valid_df)
 
-# Load tokenizer and model
 tokenizer = AutoTokenizer.from_pretrained("kihoonlee/STOCK_SOLAR-10.7B")
 model = AutoModelForCausalLM.from_pretrained("kihoonlee/STOCK_SOLAR-10.7B")
 
-# Tokenize the datasets
 def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=128)
 
 train_dataset = train_dataset.map(tokenize_function, batched=True)
 valid_dataset = valid_dataset.map(tokenize_function, batched=True)
 
-# Set the format of the datasets
 train_dataset.set_format(type="torch", columns=["input_ids", "attention_mask"])
 valid_dataset.set_format(type="torch", columns=["input_ids", "attention_mask"])
 
-# Data collator
 data_collator = DataCollatorForLanguageModeling(
     tokenizer=tokenizer,
     mlm=False,
 )
 
-# Custom callback for logging
 class LoggingCallback(TrainerCallback):
     def on_log(self, args, state, control, logs=None, **kwargs):
         logs = logs or {}
         print(logs)
 
-# Training arguments
 training_args = TrainingArguments(
     output_dir='./results',
     overwrite_output_dir=True,
@@ -108,7 +98,6 @@ training_args = TrainingArguments(
     logging_steps=100,  # Log every 100 steps
 )
 
-# Trainer
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -118,10 +107,8 @@ trainer = Trainer(
     callbacks=[LoggingCallback]  # Add the custom callback here
 )
 
-# Train the model
 trainer.train()
 
-# Save the model
 try:
     model.save_pretrained('./fine_tuned_model')
     tokenizer.save_pretrained('./fine_tuned_model')
