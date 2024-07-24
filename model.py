@@ -1,71 +1,24 @@
-import zipfile
-import os
-import json
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForCausalLM, Trainer, TrainingArguments, DataCollatorForLanguageModeling, TrainerCallback
 from datasets import Dataset
 import torch
+import time
 
-# 데이터셋 경로
-dataset_path = r'D:\Google_Cloud_Ai_Project\015.동화_줄거리_생성_데이터'
-train_path = os.path.join(dataset_path, 'Training')
-valid_path = os.path.join(dataset_path, 'Validation')
+# CSV 파일 경로
+train_csv_file_path = r'D:\Google_Cloud_Ai_Project\training_data.csv'
+valid_csv_file_path = r'D:\Google_Cloud_Ai_Project\validation_data.csv'
 
-# 모든 zip 파일을 폴더 내에서 추출하는 함수
-def extract_all_zips(folder_path):
-    for root, _, files in os.walk(folder_path):
-        for file in files:
-            if file.endswith('.zip'):
-                zip_file_path = os.path.join(root, file)
-                extract_folder = zip_file_path.replace('.zip', '')
-                os.makedirs(extract_folder, exist_ok=True)
-                with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-                    zip_ref.extractall(extract_folder)
+# CSV 파일 로드
+train_df = pd.read_csv(train_csv_file_path)
+valid_df = pd.read_csv(valid_csv_file_path)
 
-# JSON 데이터에서 문단 정보를 추출하는 함수
-def extract_paragraph_info(json_data):
-    title = json_data.get('title', 'Unknown Title')
-    paragraphs = json_data.get('paragraphInfo', [])
-    data = []
-    for para in paragraphs:
-        data.append({
-            'title': title,
-            'text': para['srcText'],
-            'page': para['srcPage'],
-            'sentences': para['srcSentenceEA'],
-            'words': para['srcWordEA']
-        })
-    return data
-
-# 모든 JSON 데이터를 로드하는 함수
-def load_all_json_data(folder_path):
-    all_data = []
-    seen = set()  # 중복된 문단을 추적하기 위한 집합
-    for root, _, files in os.walk(folder_path):
-        for file in files:
-            if file.endswith('.json'):
-                json_file_path = os.path.join(root, file)
-                with open(json_file_path, 'r', encoding='utf-8') as json_file:
-                    json_data = json.load(json_file)
-                    data = extract_paragraph_info(json_data)
-                    for entry in data:
-                        text = entry['text']
-                        if text not in seen:  # 중복 체크
-                            seen.add(text)
-                            all_data.append(entry)
-    return all_data
-
-# zip 파일 추출
-extract_all_zips(train_path)
-extract_all_zips(valid_path)
-
-# JSON 데이터 로드
-train_data = load_all_json_data(train_path)
-valid_data = load_all_json_data(valid_path)
+# 데이터셋 크기 줄이기 (필요시)
+train_df = train_df[:1000]
+valid_df = valid_df[:1000]
 
 # 데이터프레임 생성 및 정렬
-train_df = pd.DataFrame(train_data).sort_values(by=['title', 'page'])
-valid_df = pd.DataFrame(valid_data).sort_values(by=['title', 'page'])
+train_df = train_df.sort_values(by=['title', 'page'])
+valid_df = valid_df.sort_values(by=['title', 'page'])
 
 # Hugging Face 데이터셋 생성
 train_dataset = Dataset.from_pandas(train_df)
@@ -98,17 +51,36 @@ class LoggingCallback(TrainerCallback):
         logs = logs or {}
         print(logs)
 
+# 첫 10 스텝 동안의 시간을 측정하여 전체 시간을 예측하는 콜백
+class TimeLoggingCallback(TrainerCallback):
+    def __init__(self):
+        self.start_time = None
+        self.total_steps = 0
+
+    def on_step_begin(self, args, state, control, **kwargs):
+        if state.global_step == 1:
+            self.start_time = time.time()
+
+    def on_step_end(self, args, state, control, **kwargs):
+        self.total_steps += 1
+        if self.total_steps == 10:
+            end_time = time.time()
+            elapsed_time = end_time - self.start_time
+            est_total_time = elapsed_time * (args.max_steps / 10)
+            print(f"Estimated total training time: {est_total_time / 3600:.2f} hours")
+
 # 트레이닝 아규먼트 설정
 training_args = TrainingArguments(
     output_dir='./results',
     overwrite_output_dir=True,
-    num_train_epochs=1,  # 에폭 수를 1로 설정
-    per_device_train_batch_size=1,  # 배치 크기를 1로 설정
+    num_train_epochs=3,  # 에폭 수를 3로 설정
+    per_device_train_batch_size=8,  # 배치 크기를 8로 설정
     save_steps=10_000,
     save_total_limit=2,
     evaluation_strategy="epoch",
     logging_dir='./logs',  # 로그 저장 디렉토리
     logging_steps=100,  # 100 스텝마다 로그 기록
+    fp16=True,  # 혼합 정밀도 학습을 사용하여 GPU 메모리 절약 및 학습 속도 향상
 )
 
 # 트레이너 설정
@@ -118,7 +90,7 @@ trainer = Trainer(
     data_collator=data_collator,
     train_dataset=train_dataset,
     eval_dataset=valid_dataset,
-    callbacks=[LoggingCallback]  # 커스텀 콜백 추가
+    callbacks=[LoggingCallback(), TimeLoggingCallback()]  # 커스텀 콜백 추가
 )
 
 # 모델 트레이닝
