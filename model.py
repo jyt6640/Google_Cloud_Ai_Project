@@ -5,8 +5,8 @@ import torch
 import time
 
 # CSV 파일 경로
-train_csv_file_path = r'D:\Google_Cloud_Ai_Project\training_data.csv'
-valid_csv_file_path = r'D:\Google_Cloud_Ai_Project\validation_data.csv'
+train_csv_file_path = r'C:\Users\admin\Desktop\Google_Cloud_Ai_Project\training_data.csv'
+valid_csv_file_path = r'C:\Users\admin\Desktop\Google_Cloud_Ai_Project\validation_data.csv'
 
 # CSV 파일 로드
 train_df = pd.read_csv(train_csv_file_path)
