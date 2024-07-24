@@ -25,8 +25,8 @@ train_dataset = Dataset.from_pandas(train_df)
 valid_dataset = Dataset.from_pandas(valid_df)
 
 # 토크나이저 및 모델 로드
-tokenizer = AutoTokenizer.from_pretrained("THUDM/glm-4-9b-chat", trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained("THUDM/glm-4-9b-chat", trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained("beomi/KoAlpaca-Polyglot-12.8B", trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained("beomi/KoAlpaca-Polyglot-12.8B", trust_remote_code=True)
 
 # 토크나이즈 함수 정의
 def tokenize_function(examples):
