@@ -28,16 +28,25 @@ valid_dataset = Dataset.from_pandas(valid_df)
 tokenizer = AutoTokenizer.from_pretrained("beomi/KoAlpaca-Polyglot-12.8B", trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained("beomi/KoAlpaca-Polyglot-12.8B", trust_remote_code=True)
 
-# 토크나이즈 함수 정의
-def tokenize_function(examples):
-    return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=128)
+# 데이터셋 전처리 함수 정의
+def preprocess_function(examples):
+    inputs = examples['instruction']
+    outputs = examples['output']
+    model_inputs = tokenizer(inputs, max_length=128, truncation=True, padding="max_length")
+
+    # 'output'을 labels로 사용
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(outputs, max_length=128, truncation=True, padding="max_length")
+
+    model_inputs["labels"] = labels["input_ids"]
+    return model_inputs
 
 # 데이터셋 토크나이즈 및 형식 지정
-train_dataset = train_dataset.map(tokenize_function, batched=True)
-valid_dataset = valid_dataset.map(tokenize_function, batched=True)
+train_dataset = train_dataset.map(preprocess_function, batched=True)
+valid_dataset = valid_dataset.map(preprocess_function, batched=True)
 
-train_dataset.set_format(type="torch", columns=["input_ids", "attention_mask"])
-valid_dataset.set_format(type="torch", columns=["input_ids", "attention_mask"])
+train_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+valid_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
 
 # 데이터 콜레이터 설정
 data_collator = DataCollatorForLanguageModeling(
